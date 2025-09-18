@@ -3,7 +3,7 @@ data_dir: ./data
 file_patterns:
   core_prefix: "portfolio_unsaved_portfolio_"
   additional_prefix: "additional_"
-  date_regex: '(\\d{4}-\\d{2}-\\d{2})'
+  date_regex: '([0-9]{4}-[0-9]{2}-[0-9]{2})'
 
 id_columns: [simfin_id, ticker, isin]
 prefer_join_key: simfin_id
