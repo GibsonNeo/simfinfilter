@@ -1,0 +1,112 @@
+data_dir: ./data
+
+file_patterns:
+  core_prefix: "portfolio_unsaved_portfolio_"
+  additional_prefix: "additional_"
+  date_regex: "(\d{4}-\d{2}-\d{2})"
+
+id_columns: [simfin_id, ticker, isin]
+prefer_join_key: simfin_id
+
+column_registry:
+  core:
+    simfin_id:        {aliases: ["SimFin ID"], required: true}
+    company:          {aliases: ["Company - Company Name"], required: true}
+    ticker:           {aliases: ["Ticker - Stock Ticker"], required: true}
+    isin:             {aliases: ["ISIN - ISIN Database Number"], required: false}
+    revenues:         {aliases: ["Revenues"], ttm: true, units: USD}
+    ebit:             {aliases: ["EBIT - Operating Income (EBIT)"], ttm: true}
+    net_income:       {aliases: ["Net income - Net Income (common shareholders)"], ttm: true}
+    fcf:              {aliases: ["FCF - Free Cash Flow"], ttm: true}
+    pe:               {aliases: ["P/E - Price to Earnings Ratio"], ttm: true}
+    roa:              {aliases: ["ROA - Return on Assets"], ttm: true}
+    price:            {aliases: ["Price Close"], ttm: true}
+    mcap:             {aliases: ["MCAP - Market Cap"], ttm: true}
+    cogs:             {aliases: ["COGS - Cost of Goods Sold"], ttm: true}
+    shares_basic:     {aliases: ["Avg. shares basic - Average Shares Outstanding, basic"], ttm: true}
+    gross_profit:     {aliases: ["Gross Profit"], ttm: true}
+    opex:             {aliases: ["Op. Exp. - Operating Expenses"], ttm: true}
+    sga:              {aliases: ["SG&A - Selling, General and Administrative"], ttm: true}
+    ebitda:           {aliases: ["EBITDA"], ttm: true}
+    st_debt:          {aliases: ["ST debt - Current Debt"], ttm: true}
+    current_assets:   {aliases: ["Cur.assets - Total Current Assets"], ttm: true}
+    total_debt:       {aliases: ["Debt - Total Debt"], ttm: true}
+    equity:           {aliases: ["Equity - Total Equity"], ttm: true}
+    chg_wc:           {aliases: ["Chg.WC - Change in Working Capital"], ttm: true}
+    ocf:              {aliases: ["OP. CF - Operating Cash Flow"], ttm: true}
+    icf:              {aliases: ["Inv. CF - Investing Cash Flow"], ttm: true}
+    fin_cf:           {aliases: ["Fin. CF - Financing Cash Flow"], ttm: true}
+    gross_margin:     {aliases: ["Gross Margin"], ttm: true, type: pct}
+    op_margin:        {aliases: ["Operating Margin"], ttm: true, type: pct}
+    net_margin:       {aliases: ["Net Margin - Net Profit Margin"], ttm: true, type: pct}
+    roe:              {aliases: ["ROE - Return on Equity"], ttm: true, type: pct}
+    fcf_to_net:       {aliases: ["FCF/Net inc. - Free Cash Flow to Net Income"], ttm: true}
+    rnd:              {aliases: ["R&D - Research & Development Expenses"], ttm: true}
+  additional:
+    cash:             {aliases: ["Cash and eq.", "Cash and Cash-equivalents"], ttm: true}
+    current_liab:     {aliases: ["Cur.liab.", "Total Current Liabilities"], ttm: true}
+    total_liab:       {aliases: ["Liabilities", "Total Liabilities"], ttm: true}
+    assets:           {aliases: ["Assets", "Total Assets"], ttm: true}
+    da:               {aliases: ["D&A", "Depreciation & Amortisation"], ttm: true}
+    croic:            {aliases: ["CROIC", "Cash Return On Invested Capital"], ttm: true, type: pct}
+    taxes:            {aliases: ["Taxes", "Income Taxes"], ttm: true}
+
+metrics:
+  fcf_margin:     "fcf / revenues"
+  fcf_conversion: "fcf / net_income"
+  invested_capital: "total_debt + equity - cash"
+  tax_rate:         "safe_div(taxes, max0(ebit))"
+  nopat:            "ebit * (1 - tax_rate)"
+  roic:             "safe_div(nopat, invested_capital)"
+  net_debt:         "total_debt - cash"
+  debt_to_equity:   "safe_div(total_debt, equity)"
+  current_ratio:    "safe_div(current_assets, current_liab)"
+  liab_to_assets:   "safe_div(total_liab, assets)"
+  ev:               "mcap + total_debt - cash"
+  ev_ebitda:        "safe_div(ev, ebitda)"
+  fcf_yield:        "safe_div(fcf, mcap)"
+
+growth_windows: ["1Y","2Y","3Y"]
+
+recency:
+  mode: fixed
+  growth_weights: {yoy: 0.60, cagr2: 0.30, cagr3: 0.10}
+  quality_ttm_weights: {ttm: 0.70, avg_prev_2y: 0.20, avg_prev_3to5y: 0.10}
+  balance_trend_weights: {level_ttm: 0.80, trend_1y: 0.20}
+  valuation_weights: {current: 0.80, mean_rev_3y: 0.20}
+  ema: {half_life_years: 1.5}
+
+sector_industry:
+  enrich: false
+  preferred: simfin
+  fallbacks: [finnhub, fmp]
+  cache_days: 14
+  local_meta_csv: ""
+  local_meta_join_on: "simfin_id"
+  local_meta_cols: ["sector","industry"]
+
+grading:
+  winsor: {p_low: 0.01, p_high: 0.99}
+  standardize: percentile
+  latest_as_of_only: true
+  pillars:
+    growth:
+      weight: 0.35
+      metrics: ["rev_yoy","rev_cagr2","rev_cagr3","ebit_yoy","ebit_cagr2","ebit_cagr3","fcf_yoy","fcf_cagr2","fcf_cagr3"]
+    quality:
+      weight: 0.35
+      metrics: ["croic_ttm","roe_ttm","roa_ttm","fcf_conversion_ttm","op_margin_ttm"]
+    balance:
+      weight: 0.20
+      metrics: ["net_debt","debt_to_equity","current_ratio","liab_to_assets"]
+      direction: {net_debt: lower_better, debt_to_equity: lower_better, current_ratio: higher_better, liab_to_assets: lower_better}
+    valuation:
+      weight: 0.10
+      metrics: ["pe_ttm","fcf_yield","ev_ebitda"]
+      direction: {pe_ttm: lower_better, fcf_yield: higher_better, ev_ebitda: lower_better}
+      optional: true
+  sector_overrides: {}
+
+export:
+  excel_filename: "Scorebook_{as_of_max}.xlsx"
+  tabs: ["Overview","Growth","Quality","BalanceCash","Valuation","Grades","DataDictionary","IngestAudit"]
